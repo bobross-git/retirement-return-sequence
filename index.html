@@ -22,7 +22,7 @@
   }
 
   body {
-    font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    font-family: system-ui, sans-serif;
     margin: 20px;
     background: var(--bg);
     color: var(--fg);
@@ -46,13 +46,7 @@
 
   .form-row > div {
     flex: 1;
-    min-width: 180px;
-  }
-
-  label {
-    display: block;
-    font-size: 0.9rem;
-    margin-bottom: 4px;
+    min-width: 160px;
   }
 
   input[type="number"] {
@@ -60,7 +54,6 @@
     padding: 6px 8px;
     border-radius: 4px;
     border: 1px solid #ccc;
-    box-sizing: border-box;
     background: var(--panel);
     color: var(--fg);
   }
@@ -75,7 +68,6 @@
     cursor: pointer;
     margin-top: 8px;
   }
-  button:hover { background: #1d4ed8; }
 
   table {
     width: 100%;
@@ -87,37 +79,28 @@
   th, td {
     border: 1px solid #ddd;
     padding: 6px 8px;
-    text-align: right;
   }
 
   th {
     background: var(--table-head);
-    text-align: left;
-  }
-
-  th:nth-child(n+2),
-  td:nth-child(n+2) {
-    text-align: right;
   }
 
   .editable {
     background: var(--edit-bg);
-    cursor: pointer;
   }
 
-  /* Toggle switch */
+  /* Toggle */
   .switch {
     position: relative;
     display: inline-block;
     width: 46px;
     height: 24px;
   }
-  .switch input { display: none; }
+  .switch input { display:none; }
   .slider {
     position: absolute;
     cursor: pointer;
-    top: 0; left: 0;
-    right: 0; bottom: 0;
+    inset: 0;
     background-color: #ccc;
     transition: .3s;
     border-radius: 24px;
@@ -129,37 +112,40 @@
     width: 18px;
     left: 3px;
     bottom: 3px;
-    background: white;
+    background: #fff;
     border-radius: 50%;
     transition: .3s;
   }
   input:checked + .slider { background-color: #4CAF50; }
   input:checked + .slider:before { transform: translateX(22px); }
-</style>
 
+</style>
 </head>
+
 <body>
 
 <div class="container">
   <h1>Retirement Sequence Simulator</h1>
-  <p>Simulate withdrawals over historical returns and inflation.</p>
 
   <div class="form-row">
     <div>
       <label>Starting Balance</label>
-      <input type="number" id="startBalance" value="2000000" />
+      <input type="number" id="startBalance" value="2000000">
     </div>
+
     <div>
       <label>Beginning Year (1990–2025)</label>
-      <input type="number" id="startYear" value="1990" />
+      <input type="number" id="startYear" value="1990">
     </div>
+
     <div>
       <label>Initial Withdrawal (before inflation)</label>
-      <input type="number" id="baseWithdrawal" value="200000" />
+      <input type="number" id="baseWithdrawal" value="200000">
     </div>
+
     <div>
       <label>
-        <input type="checkbox" id="skipDown" checked>
+        <input type="checkbox" id="skipDownYears" checked>
         Skip withdrawals after down years
       </label>
     </div>
@@ -182,17 +168,12 @@
     <tbody></tbody>
   </table>
 
-  <br><br>
-  <button onclick="document.body.classList.toggle('dark')">
-    Toggle Light/Dark
-  </button>
+  <br>
+  <button onclick="document.body.classList.toggle('dark')">Toggle Light/Dark</button>
 </div>
 
 <script>
-/* ---------------------------- */
-/*      DATA THROUGH 2025       */
-/* ---------------------------- */
-
+/* Data */
 const years = [
   1990,1991,1992,1993,1994,1995,1996,1997,1998,1999,
   2000,2001,2002,2003,2004,2005,2006,2007,2008,2009,
@@ -214,67 +195,65 @@ const portfolioReturns = [
   15.0,15.95,-16.96,17.50,15.36,13.78
 ];
 
-/* ---------------------------- */
-/*        HELPER FUNCS          */
-/* ---------------------------- */
-
 function fmt(x) { return x.toLocaleString(undefined,{maximumFractionDigits:0}); }
-
-function parseCell(cell) {
-  const raw = cell.innerText.replace(/,/g,"").trim();
-  if (raw === "") return 0;
-  const n = Number(raw);
-  return isNaN(n) ? 0 : n;
+function parseCell(el) {
+  const raw = el.innerText.replace(/,/g,"").trim();
+  if (raw==="" || isNaN(raw)) return 0;
+  return Number(raw);
 }
 
-/* ---------------------------- */
-/*        BUILD SIMULATION       */
-/* ---------------------------- */
-
+/* Main */
 document.getElementById("runBtn").onclick = runSim;
 
 function runSim() {
+  const baseW = Number(document.getElementById("baseWithdrawal").value);
   const startBal = Number(document.getElementById("startBalance").value);
   const startYear = Number(document.getElementById("startYear").value);
-  const baseW = Number(document.getElementById("baseWithdrawal").value);
-  const skipDown = document.getElementById("skipDown").checked;
+  const skipDown = document.getElementById("skipDownYears").checked;
 
-  const idx = years.indexOf(startYear);
-  if (idx === -1) { alert("Start year must be between 1990 and 2025."); return; }
+  const startIdx = years.indexOf(startYear);
+  if (startIdx === -1) return alert("Start year must be between 1990 and 2025.");
 
-  const yrsToSim = years.length - idx;
-  buildTable(idx, yrsToSim, startBal, baseW, skipDown);
+  const yrs = years.length - startIdx;
+  buildTable(startIdx, yrs, startBal, baseW, skipDown);
   document.getElementById("resultsTable").style.display = "table";
 }
 
-function buildTable(startIdx, yrsToSim, startBal, baseW, skipDown) {
+function buildTable(startIdx, yrs, startBal, baseW, skipDown) {
   const tbody = document.querySelector("#resultsTable tbody");
   tbody.innerHTML = "";
 
-  let balance = startBal;
+  let bal = startBal;
   let lastReal = baseW;
 
-  for (let i = 0; i < yrsToSim; i++) {
-    const yIndex = startIdx + i;
-    const yr = years[yIndex];
-    const ret = portfolioReturns[yIndex];
+  for (let i=0; i<yrs; i++) {
+    const idx = startIdx + i;
+    const yr = years[idx];
+    const ret = portfolioReturns[idx];
 
     const row = document.createElement("tr");
 
-    const initialW = (i === 0) ? baseW : 0;
+    // ALWAYS show base withdrawal in the field
+    const displayedWithdrawal = baseW;
+
+    // Toggle logic:
+    // Default ON
+    // But if skipDownYears AND last return was negative → OFF
+    let toggleOn = true;
+    if (skipDown && ret < 0) toggleOn = false;
 
     row.innerHTML = `
       <td>${yr}</td>
-      <td class="startBal">${fmt(balance)}</td>
+      <td class="startBal">${fmt(bal)}</td>
 
       <td>
         <label class="switch">
-          <input type="checkbox" class="toggleWithdraw" checked>
+          <input type="checkbox" class="toggleWithdraw" ${toggleOn?"checked":""}>
           <span class="slider"></span>
         </label>
       </td>
 
-      <td class="withdraw editable" contenteditable="true">${fmt(initialW)}</td>
+      <td class="withdraw editable" contenteditable="true">${fmt(displayedWithdrawal)}</td>
       <td>${ret.toFixed(2)}</td>
       <td class="dollarRet"></td>
       <td class="endBal"></td>
@@ -282,88 +261,20 @@ function buildTable(startIdx, yrsToSim, startBal, baseW, skipDown) {
 
     tbody.appendChild(row);
 
-    balance = applyRow(row, balance, ret);
-
-    lastReal = initialW;
-  }
-
-  attachHandlers(startIdx, yrsToSim, startBal, baseW, skipDown);
-}
-
-function applyRow(row, bal, ret) {
-  let w = parseCell(row.querySelector(".withdraw"));
-  const toggle = row.querySelector(".toggleWithdraw").checked;
-
-  if (!toggle || w === 0) w = 0;
-
-  const after = bal - w;
-  const dR = after * (ret / 100);
-  const end = after + dR;
-
-  row.querySelector(".dollarRet").innerText = fmt(dR);
-  row.querySelector(".endBal").innerText = fmt(end);
-
-  return end;
-}
-
-function attachHandlers(startIdx, yrsToSim, startBal, baseW, skipDown) {
-  const rows = [...document.querySelectorAll("#resultsTable tbody tr")];
-
-  rows.forEach(r => {
-    r.querySelector(".toggleWithdraw").addEventListener("change", () =>
-      recalcAll(startIdx, yrsToSim, startBal, baseW, skipDown)
-    );
-    r.querySelector(".withdraw").addEventListener("blur", () => {
-      let v = parseCell(r.querySelector(".withdraw"));
-      r.querySelector(".withdraw").innerText = fmt(v);
-      recalcAll(startIdx, yrsToSim, startBal, baseW, skipDown);
-    });
-  });
-}
-
-function recalcAll(startIdx, yrsToSim, startBal, baseW, skipDown) {
-  const rows = [...document.querySelectorAll("#resultsTable tbody tr")];
-
-  let bal = startBal;
-  let lastReal = baseW;
-
-  for (let i = 0; i < rows.length; i++) {
-    const row = rows[i];
-    const ret = portfolioReturns[startIdx + i];
-    const infl = 1 + inflation[startIdx + i] / 100;
-
-    const toggle = row.querySelector(".toggleWithdraw").checked;
-    let manual = parseCell(row.querySelector(".withdraw"));
-    let w;
-
-    if (!toggle || manual === 0) {
-      w = 0;
-    } else if (manual > 0) {
-      w = manual;
-      lastReal = manual;
-    } else {
-      if (lastReal > 0) {
-        w = Math.floor(lastReal * infl);
-        lastReal = w;
-      } else {
-        w = 0;
-      }
-    }
-
-    row.querySelector(".withdraw").innerText = fmt(w);
-
+    // Apply logic after UI:
+    let w = toggleOn ? baseW : 0;
     const after = bal - w;
-    const dR = after * (ret / 100);
+    const dR = after * (ret/100);
     const end = after + dR;
 
-    row.querySelector(".startBal").innerText = fmt(bal);
     row.querySelector(".dollarRet").innerText = fmt(dR);
     row.querySelector(".endBal").innerText = fmt(end);
 
     bal = end;
+    if (w > 0) lastReal = w;
   }
 }
-</script>
 
+</script>
 </body>
 </html>
