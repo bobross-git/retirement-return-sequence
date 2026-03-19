@@ -1,203 +1,137 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8" />
-<title>Retirement Sequence Simulator</title>
+<meta charset="UTF-8">
+<title>Retirement Sequence Simulator + Life Insurance Integration</title>
+
+<!-- Tesseract OCR -->
+<script src="https://cdn.jsdelivr.net/npm/tesseract.js@5.0.3/dist/tesseract.min.js"></script>
 
 <style>
-  :root {
-    --bg: #f5f5f5;
-    --fg: #000;
-    --panel: #fff;
-    --table-head: #f0f4f8;
-    --edit-bg: #fffbe8;
-  }
-
-  body.dark {
-    --bg: #1a1a1a;
-    --fg: #e6e6e6;
-    --panel: #2a2a2a;
-    --table-head: #333;
-    --edit-bg: #4a4300;
-  }
-
   body {
     font-family: system-ui, sans-serif;
-    margin: 20px;
-    background: var(--bg);
-    color: var(--fg);
+    background: #f4f4f4;
+    padding: 20px;
   }
-
   .container {
-    max-width: 1200px;
-    margin: 0 auto;
-    background: var(--panel);
+    max-width: 1400px;
+    margin: auto;
+    background: white;
     padding: 20px;
     border-radius: 8px;
-    box-shadow: 0 2px 6px rgba(0,0,0,0.08);
+    box-shadow: 0 3px 6px rgba(0,0,0,0.1);
   }
-
-  .form-row {
-    display: flex;
-    gap: 16px;
-    margin-bottom: 10px;
-    flex-wrap: wrap;
-  }
-
-  .form-row > div {
-    flex: 1;
-    min-width: 160px;
-  }
-
-  input[type="number"] {
-    width: 100%;
-    padding: 6px 8px;
-    border-radius: 4px;
-    border: 1px solid #ccc;
-    background: var(--panel);
-    color: var(--fg);
-  }
-
-  button {
-    padding: 8px 16px;
-    border-radius: 4px;
-    border: none;
-    background: #2563eb;
-    color: #fff;
-    font-weight: 600;
-    cursor: pointer;
-    margin-top: 8px;
-  }
-
   table {
     width: 100%;
     border-collapse: collapse;
     margin-top: 20px;
-    font-size: 0.9rem;
+    font-size: 14px;
   }
-
   th, td {
-    border: 1px solid #ddd;
+    border: 1px solid #ccc;
     padding: 6px 8px;
   }
-
   th {
-    background: var(--table-head);
+    background: #e6eef7;
   }
-
-  .editable {
-    background: var(--edit-bg);
-  }
-
-  .switch {
-    position: relative;
-    display: inline-block;
-    width: 46px;
-    height: 24px;
-  }
+  .editable { background: #fffbe6; }
+  .switch { position: relative; display: inline-block; width: 46px; height: 24px; }
   .switch input { display:none; }
   .slider {
-    position: absolute;
-    cursor: pointer;
-    inset: 0;
-    background-color: #ccc;
-    transition: .3s;
-    border-radius: 24px;
+    position:absolute; cursor:pointer; top:0; left:0; right:0; bottom:0;
+    background:#ccc; transition:.3s; border-radius:24px;
   }
   .slider:before {
-    position: absolute;
-    content: "";
-    height: 18px;
-    width: 18px;
-    left: 3px;
-    bottom: 3px;
-    background: #fff;
-    border-radius: 50%;
-    transition: .3s;
+    position:absolute; content:""; height:18px; width:18px; left:3px; bottom:3px;
+    background:white; transition:.3s; border-radius:20px;
   }
-  input:checked + .slider { background-color: #4CAF50; }
-  input:checked + .slider:before { transform: translateX(22px); }
+  input:checked +checked + .slider:before { transform: translateX(22px); }
+  #ocrStatus { margin-top:10px; font-weight:bold; }
 </style>
 </head>
 
 <body>
 
 <div class="container">
-  <h1>Retirement Sequence Simulator</h1>
 
-  <div class="form-row">
-    <div>
-      <label>Starting Balance</label>
-      <input type="number" id="startBalance" value="2000000">
-    </div>
+<h1>Retirement Sequence Simulator + Life Insurance Integration</h1>
 
-    <div>
-      <label>Beginning Year (1990–2025)</label>
-      <input type="number" id="startYear" value="1990">
-    </div>
+<h2>Life Insurance Ledger Upload</h2>
 
-    <div>
-      <label>Initial Withdrawal (before inflation)</label>
-      <input type="number" id="baseWithdrawal" value="200000">
-    </div>
+<input type="file" id="ledgerImage" accept="image/*">
+<div id="ocrStatus"></div>
 
-    <div>
-      <label>
-        <input type="checkbox" id="skipDownYears" checked>
-        Skip withdrawals after down years
-      </label>
-    </div>
-  </div>
+<hr>
 
-  <button id="runBtn">Run Simulation</button>
+<h2>Portfolio Simulation Settings</h2>
 
-  <table id="resultsTable" style="display:none;">
-    <thead>
-      <tr>
-        <th>Year</th>
-        <th>Start Balance</th>
-        <th>Withdraw?</th>
-        <th>Withdrawal</th>
-        <th>Return %</th>
-        <th>Dollar Return</th>
-        <th>Ending Balance</th>
-      </tr>
-    </thead>
-    <tbody></tbody>
-    <tfoot>
-      <tr id="totalRow" style="font-weight:bold;">
-        <td>TOTAL</td>
-        <td colspan="2"></td>
-        <td id="totalWithdrawalsCell"></td>
-        <td colspan="3"></td>
-      </tr>
-    </tfoot>
-  </table>
+<label>Starting Balance:</label>
+<input type="number" id="startBalance" value="2000000"><br><br>
 
-  <br>
-  <button onclick="document.body.classList.toggle('dark')">
-    Toggle Light/Dark
-  </button>
+<label>Start Year (1990–2025):</label>
+<input type="number" id="startYear" value="1990"><br><br>
+
+<label>Initial Withdrawal (base amount):</label>
+<input type="number" id="baseWithdrawal" value="200000"><br><br>
+
+<label><input type="checkbox" id="skipDownYears" checked> Skip withdrawals after down years</label><br><br>
+
+<button id="runBtn">Run Simulation</button>
+
+<table id="resultsTable" style="display:none;">
+  <thead>
+    <tr>
+      <th>Year</th>
+      <th>Start Balance</th>
+      <th>Withdraw?</th>
+      <th>Withdrawal</th>
+      <th>Return %</th>
+      <th>Dollar Return</th>
+      <th>End Balance</th>
+
+      <!-- NEW LI COLUMNS -->
+      <th>LI W/D</th>
+      <th>LI Cash Value</th>
+      <th>LI Death Benefit</th>
+    </tr>
+  </thead>
+  <tbody></tbody>
+
+  <tfoot>
+    <tr style="font-weight:bold;">
+      <td>TOTAL</td>
+      <td colspan="2"></td>
+      <td id="totalPortWD"></td>
+      <td></td>
+      <td></td>
+      <td></td>
+
+      <td id="totalLIWD"></td>
+      <td></td>
+      <td id="finalLIDB"></td>
+    </tr>
+  </tfoot>
+
+</table>
+
 </div>
 
-
 <script>
-/* ------------------ DATA THROUGH 2025 ------------------- */
-
+/* -------------------------------------------------
+   SIM RETURN AND INFLATION DATA (YOUR EXISTING DATA)
+---------------------------------------------------*/
 const years = [
   1990,1991,1992,1993,1994,1995,1996,1997,1998,1999,
   2000,2001,2002,2003,2004,2005,2006,2007,2008,2009,
   2010,2011,2012,2013,2014,2015,2016,2017,2018,2019,
   2020,2021,2022,2023,2024,2025
 ];
-
 const inflation = [
   5.39,4.23,3.03,2.96,2.61,2.81,3.29,2.34,1.55,2.19,
   3.38,2.83,1.59,2.27,2.68,3.39,3.24,2.85,3.85,-0.36,
   1.64,3.16,2.07,1.46,1.62,0.12,1.26,2.13,2.44,1.81,
   1.2,4.7,8.0,4.1,2.9,2.6
 ];
-
 const portfolioReturns = [
   2.72,25.78,7.51,10.34,-0.17,29.33,15.43,23.27,20.96,12.70,
   -1.41,-4.76,-7.56,19.65,8.16,3.82,11.21,7.08,-20.06,17.94,
@@ -205,86 +139,152 @@ const portfolioReturns = [
   15.0,15.95,-16.96,17.50,15.36,13.78
 ];
 
-/* ------------------ HELPERS ------------------- */
+/* -------------------------------------------------
+   LIFE INSURANCE DATA (OCR FILLS THIS ARRAY)
+---------------------------------------------------*/
+let lifeInsuranceData = [];  // Each entry: { age: 65, wd: -80000, cash: 577498, db: 872358 }
 
-function fmt(x) {
-  return x.toLocaleString(undefined,{maximumFractionDigits:0});
-}
+/* -------------------------------------------------
+   OCR EXTRACTION OF SCREENSHOT
+---------------------------------------------------*/
+document.getElementById("ledgerImage").addEventListener("change", async function() {
+  const file = this.files[0];
+  if (!file) return;
 
-function parseCell(el) {
-  const raw = el.innerText.replace(/,/g,"").trim();
-  if (raw === "" || isNaN(raw)) return 0;
-  return Number(raw);
-}
+  document.getElementById("ocrStatus").innerText = "Reading screenshot…";
 
-/* ------------------ MAIN ------------------- */
+  const { data: { text } } = await Tesseract.recognize(file, "eng");
 
+  document.getElementById("ocrStatus").innerText = "Processing extracted text…";
+
+  lifeInsuranceData = [];
+
+  const lines = text.split("\n");
+
+  lines.forEach(line => {
+    const clean = line.trim();
+    if (!clean.match(/^[0-9]/)) return; // lines starting with Age
+
+    const parts = clean.split(/\s+/);
+    if (parts.length < 4) return;
+
+    const age = parseInt(parts[0]);
+    const out = parseFloat(parts[1].replace(/[^0-9.-]/g,""));
+    const cash = parseFloat(parts[2].replace(/[^0-9.-]/g,""));
+    const db = parseFloat(parts[parts.length - 1].replace(/[^0-9.-]/g,""));
+
+    if (!isNaN(age)) {
+      lifeInsuranceData.push({
+        age: age,
+        wd: out < 0 ? Math.abs(out) : 0, // policy outlay negative means distribution
+        cash: cash,
+        db: db
+      });
+    }
+  });
+
+  document.getElementById("ocrStatus").innerText = "Ledger loaded. You can now run the simulation.";
+});
+
+/* -------------------------------------------------
+   UTILITIES
+---------------------------------------------------*/
+function fmt(n){ return n.toLocaleString(undefined,{maximumFractionDigits:0}); }
+
+/* -------------------------------------------------
+   MAIN SIMULATION
+---------------------------------------------------*/
 document.getElementById("runBtn").onclick = runSim;
 
 function runSim() {
+
   const baseW = Number(document.getElementById("baseWithdrawal").value);
   const startBal = Number(document.getElementById("startBalance").value);
   const startYear = Number(document.getElementById("startYear").value);
   const skipDown = document.getElementById("skipDownYears").checked;
 
   const startIdx = years.indexOf(startYear);
-  if (startIdx === -1) return alert("Start year must be between 1990 and 2025.");
+  if (startIdx === -1) {
+    alert("Start year must be between 1990 and 2025.");
+    return;
+  }
 
-  const yrs = years.length - startIdx;
+  const yearsToSim = years.length - startIdx;
+  buildTable(startIdx, yearsToSim, startBal, baseW, skipDown);
 
-  buildTable(startIdx, yrs, startBal, baseW, skipDown);
   document.getElementById("resultsTable").style.display = "table";
 }
 
-
 function buildTable(startIdx, yrs, startBal, baseW, skipDown) {
+
   const tbody = document.querySelector("#resultsTable tbody");
   tbody.innerHTML = "";
 
   let bal = startBal;
   let lastReal = baseW;
 
-  for (let i=0; i<yrs; i++) {
-    const idx = startIdx + i;
-    const yr = years[idx];
-    const ret = portfolioReturns[idx];
-    const inflF = 1 + inflation[idx]/100;
+  let totalPort = 0;
+  let totalLI = 0;
+  let finalLIDB = 0;
 
-    // Inflation calculation
-    let displayW;
-    if (i === 0) {
-      displayW = baseW;
-    } else {
-      displayW = Math.floor(lastReal * inflF);
-    }
+  for (let r=0; r<yrs; r++) {
+    const simYear = years[startIdx + r];
+    const ret = portfolioReturns[startIdx + r];
+    const inflF = 1 + inflation[startIdx + r]/100;
+
+    // Age mapping:
+    const age = 65 + r;
+    const liRow = lifeInsuranceData.find(x => x.age === age);
+
+    // Pre-calc displayed portfolio WD
+    let displayWD = (r === 0) ? baseW : Math.floor(lastReal * inflF);
 
     let toggleOn = true;
     if (skipDown && ret < 0) toggleOn = false;
 
     const row = document.createElement("tr");
+
+    let liWD = 0, liCash = "", liDB = "";
+
+    if (liRow) {
+      liWD = liRow.wd;
+      liCash = liRow.cash;
+      liDB = liRow.db;
+
+      finalLIDB = liDB;
+    }
+
     row.innerHTML = `
-      <td>${yr}</td>
-      <td class="startBal">${fmt(bal)}</td>
+      <td>${simYear}</td>
+      <td>${fmt(bal)}</td>
 
       <td>
         <label class="switch">
-          <input type="checkbox" class="toggleWithdraw" ${toggleOn?"checked":""}>
+          <input type="checkbox" ${toggleOn?"checked":""} disabled>
           <span class="slider"></span>
         </label>
       </td>
 
-      <td class="withdraw editable" contenteditable="true">${fmt(displayW)}</td>
+      <td>${fmt(displayWD)}</td>
       <td>${ret.toFixed(2)}</td>
       <td class="dollarRet"></td>
       <td class="endBal"></td>
+
+      <td>${liWD ? fmt(liWD) : ""}</td>
+      <td>${liCash ? fmt(liCash) : ""}</td>
+      <td>${liDB ? fmt(liDB) : ""}</td>
     `;
 
     tbody.appendChild(row);
 
-    // Actual withdrawal
-    let w = toggleOn ? displayW : 0;
+    // Actual portfolio withdrawal
+    const actualWD = toggleOn ? displayWD : 0;
+    totalPort += actualWD;
 
-    const after = bal - w;
+    // Actual LI WD
+    totalLI += liWD;
+
+    const after = bal - actualWD;
     const dR = after * (ret/100);
     const end = after + dR;
 
@@ -292,83 +292,12 @@ function buildTable(startIdx, yrs, startBal, baseW, skipDown) {
     row.querySelector(".endBal").innerText = fmt(end);
 
     bal = end;
-    if (toggleOn && w > 0) lastReal = w;
+    if (toggleOn && actualWD > 0) lastReal = actualWD;
   }
 
-  attachHandlers(startIdx, yrs, startBal, baseW, skipDown);
-  computeTotalWithdrawals();
-}
-
-
-function attachHandlers(startIdx, yrs, startBal, baseW, skipDown) {
-  const rows = [...document.querySelectorAll("#resultsTable tbody tr")];
-
-  rows.forEach((row, i) => {
-    row.querySelector(".toggleWithdraw").addEventListener("change", () =>
-      recalcAll(startIdx, yrs, startBal, baseW, skipDown)
-    );
-
-    row.querySelector(".withdraw").addEventListener("blur", () => {
-      let v = parseCell(row.querySelector(".withdraw"));
-      row.querySelector(".withdraw").innerText = fmt(v);
-      recalcAll(startIdx, yrs, startBal, baseW, skipDown);
-    });
-  });
-}
-
-
-function recalcAll(startIdx, yrs, startBal, baseW, skipDown) {
-  const rows = [...document.querySelectorAll("#resultsTable tbody tr")];
-
-  let bal = startBal;
-  let lastReal = baseW;
-
-  rows.forEach((row, i) => {
-    const idx = startIdx + i;
-    const ret = portfolioReturns[idx];
-    const inflF = 1 + inflation[idx]/100;
-
-    const toggle = row.querySelector(".toggleWithdraw").checked;
-    let manual = parseCell(row.querySelector(".withdraw"));
-
-    // Recompute display inflation
-    let displayW;
-    if (i === 0) displayW = baseW;
-    else if (manual > 0 && !isNaN(manual)) displayW = manual;
-    else if (lastReal > 0) displayW = Math.floor(lastReal * inflF);
-    else displayW = 0;
-
-    row.querySelector(".withdraw").innerText = fmt(displayW);
-
-    // Actual withdrawal
-    let w = toggle ? displayW : 0;
-
-    const after = bal - w;
-    const dR = after * (ret/100);
-    const end = after + dR;
-
-    row.querySelector(".startBal").innerText = fmt(bal);
-    row.querySelector(".dollarRet").innerText = fmt(dR);
-    row.querySelector(".endBal").innerText = fmt(end);
-
-    bal = end;
-    if (toggle && w > 0) lastReal = w;
-  });
-
-  computeTotalWithdrawals();
-}
-
-function computeTotalWithdrawals() {
-  let total = 0;
-  const rows = [...document.querySelectorAll("#resultsTable tbody tr")];
-
-  rows.forEach(row => {
-    const toggle = row.querySelector(".toggleWithdraw").checked;
-    const w = parseCell(row.querySelector(".withdraw"));
-    if (toggle && w > 0) total += w;
-  });
-
-  document.getElementById("totalWithdrawalsCell").innerText = fmt(total);
+  document.getElementById("totalPortWD").innerText = fmt(totalPort);
+  document.getElementById("totalLIWD").innerText = fmt(totalLI);
+  document.getElementById("finalLIDB").innerText = fmt(finalLIDB);
 }
 </script>
 
