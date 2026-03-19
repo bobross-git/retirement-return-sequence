@@ -89,7 +89,6 @@
     background: var(--edit-bg);
   }
 
-  /* Toggle */
   .switch {
     position: relative;
     display: inline-block;
@@ -118,7 +117,6 @@
   }
   input:checked + .slider { background-color: #4CAF50; }
   input:checked + .slider:before { transform: translateX(22px); }
-
 </style>
 </head>
 
@@ -166,14 +164,26 @@
       </tr>
     </thead>
     <tbody></tbody>
+    <tfoot>
+      <tr id="totalRow" style="font-weight:bold;">
+        <td>TOTAL</td>
+        <td colspan="2"></td>
+        <td id="totalWithdrawalsCell"></td>
+        <td colspan="3"></td>
+      </tr>
+    </tfoot>
   </table>
 
   <br>
-  <button onclick="document.body.classList.toggle('dark')">Toggle Light/Dark</button>
+  <button onclick="document.body.classList.toggle('dark')">
+    Toggle Light/Dark
+  </button>
 </div>
 
+
 <script>
-/* Data */
+/* ------------------ DATA THROUGH 2025 ------------------- */
+
 const years = [
   1990,1991,1992,1993,1994,1995,1996,1997,1998,1999,
   2000,2001,2002,2003,2004,2005,2006,2007,2008,2009,
@@ -195,14 +205,20 @@ const portfolioReturns = [
   15.0,15.95,-16.96,17.50,15.36,13.78
 ];
 
-function fmt(x) { return x.toLocaleString(undefined,{maximumFractionDigits:0}); }
+/* ------------------ HELPERS ------------------- */
+
+function fmt(x) {
+  return x.toLocaleString(undefined,{maximumFractionDigits:0});
+}
+
 function parseCell(el) {
   const raw = el.innerText.replace(/,/g,"").trim();
-  if (raw==="" || isNaN(raw)) return 0;
+  if (raw === "" || isNaN(raw)) return 0;
   return Number(raw);
 }
 
-/* Main */
+/* ------------------ MAIN ------------------- */
+
 document.getElementById("runBtn").onclick = runSim;
 
 function runSim() {
@@ -215,9 +231,11 @@ function runSim() {
   if (startIdx === -1) return alert("Start year must be between 1990 and 2025.");
 
   const yrs = years.length - startIdx;
+
   buildTable(startIdx, yrs, startBal, baseW, skipDown);
   document.getElementById("resultsTable").style.display = "table";
 }
+
 
 function buildTable(startIdx, yrs, startBal, baseW, skipDown) {
   const tbody = document.querySelector("#resultsTable tbody");
@@ -230,18 +248,20 @@ function buildTable(startIdx, yrs, startBal, baseW, skipDown) {
     const idx = startIdx + i;
     const yr = years[idx];
     const ret = portfolioReturns[idx];
+    const inflF = 1 + inflation[idx]/100;
 
-    const row = document.createElement("tr");
+    // Inflation calculation
+    let displayW;
+    if (i === 0) {
+      displayW = baseW;
+    } else {
+      displayW = Math.floor(lastReal * inflF);
+    }
 
-    // ALWAYS show base withdrawal in the field
-    const displayedWithdrawal = baseW;
-
-    // Toggle logic:
-    // Default ON
-    // But if skipDownYears AND last return was negative → OFF
     let toggleOn = true;
     if (skipDown && ret < 0) toggleOn = false;
 
+    const row = document.createElement("tr");
     row.innerHTML = `
       <td>${yr}</td>
       <td class="startBal">${fmt(bal)}</td>
@@ -253,7 +273,7 @@ function buildTable(startIdx, yrs, startBal, baseW, skipDown) {
         </label>
       </td>
 
-      <td class="withdraw editable" contenteditable="true">${fmt(displayedWithdrawal)}</td>
+      <td class="withdraw editable" contenteditable="true">${fmt(displayW)}</td>
       <td>${ret.toFixed(2)}</td>
       <td class="dollarRet"></td>
       <td class="endBal"></td>
@@ -261,8 +281,9 @@ function buildTable(startIdx, yrs, startBal, baseW, skipDown) {
 
     tbody.appendChild(row);
 
-    // Apply logic after UI:
-    let w = toggleOn ? baseW : 0;
+    // Actual withdrawal
+    let w = toggleOn ? displayW : 0;
+
     const after = bal - w;
     const dR = after * (ret/100);
     const end = after + dR;
@@ -271,10 +292,85 @@ function buildTable(startIdx, yrs, startBal, baseW, skipDown) {
     row.querySelector(".endBal").innerText = fmt(end);
 
     bal = end;
-    if (w > 0) lastReal = w;
+    if (toggleOn && w > 0) lastReal = w;
   }
+
+  attachHandlers(startIdx, yrs, startBal, baseW, skipDown);
+  computeTotalWithdrawals();
 }
 
+
+function attachHandlers(startIdx, yrs, startBal, baseW, skipDown) {
+  const rows = [...document.querySelectorAll("#resultsTable tbody tr")];
+
+  rows.forEach((row, i) => {
+    row.querySelector(".toggleWithdraw").addEventListener("change", () =>
+      recalcAll(startIdx, yrs, startBal, baseW, skipDown)
+    );
+
+    row.querySelector(".withdraw").addEventListener("blur", () => {
+      let v = parseCell(row.querySelector(".withdraw"));
+      row.querySelector(".withdraw").innerText = fmt(v);
+      recalcAll(startIdx, yrs, startBal, baseW, skipDown);
+    });
+  });
+}
+
+
+function recalcAll(startIdx, yrs, startBal, baseW, skipDown) {
+  const rows = [...document.querySelectorAll("#resultsTable tbody tr")];
+
+  let bal = startBal;
+  let lastReal = baseW;
+
+  rows.forEach((row, i) => {
+    const idx = startIdx + i;
+    const ret = portfolioReturns[idx];
+    const inflF = 1 + inflation[idx]/100;
+
+    const toggle = row.querySelector(".toggleWithdraw").checked;
+    let manual = parseCell(row.querySelector(".withdraw"));
+
+    // Recompute display inflation
+    let displayW;
+    if (i === 0) displayW = baseW;
+    else if (manual > 0 && !isNaN(manual)) displayW = manual;
+    else if (lastReal > 0) displayW = Math.floor(lastReal * inflF);
+    else displayW = 0;
+
+    row.querySelector(".withdraw").innerText = fmt(displayW);
+
+    // Actual withdrawal
+    let w = toggle ? displayW : 0;
+
+    const after = bal - w;
+    const dR = after * (ret/100);
+    const end = after + dR;
+
+    row.querySelector(".startBal").innerText = fmt(bal);
+    row.querySelector(".dollarRet").innerText = fmt(dR);
+    row.querySelector(".endBal").innerText = fmt(end);
+
+    bal = end;
+    if (toggle && w > 0) lastReal = w;
+  });
+
+  computeTotalWithdrawals();
+}
+
+function computeTotalWithdrawals() {
+  let total = 0;
+  const rows = [...document.querySelectorAll("#resultsTable tbody tr")];
+
+  rows.forEach(row => {
+    const toggle = row.querySelector(".toggleWithdraw").checked;
+    const w = parseCell(row.querySelector(".withdraw"));
+    if (toggle && w > 0) total += w;
+  });
+
+  document.getElementById("totalWithdrawalsCell").innerText = fmt(total);
+}
 </script>
+
 </body>
 </html>
