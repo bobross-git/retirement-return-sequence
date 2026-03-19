@@ -1,0 +1,369 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>Retirement Sequence Simulator</title>
+
+<style>
+  :root {
+    --bg: #f5f5f5;
+    --fg: #000;
+    --panel: #fff;
+    --table-head: #f0f4f8;
+    --edit-bg: #fffbe8;
+  }
+
+  body.dark {
+    --bg: #1a1a1a;
+    --fg: #e6e6e6;
+    --panel: #2a2a2a;
+    --table-head: #333;
+    --edit-bg: #4a4300;
+  }
+
+  body {
+    font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    margin: 20px;
+    background: var(--bg);
+    color: var(--fg);
+  }
+
+  .container {
+    max-width: 1200px;
+    margin: 0 auto;
+    background: var(--panel);
+    padding: 20px;
+    border-radius: 8px;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.08);
+  }
+
+  .form-row {
+    display: flex;
+    gap: 16px;
+    margin-bottom: 10px;
+    flex-wrap: wrap;
+  }
+
+  .form-row > div {
+    flex: 1;
+    min-width: 180px;
+  }
+
+  label {
+    display: block;
+    font-size: 0.9rem;
+    margin-bottom: 4px;
+  }
+
+  input[type="number"] {
+    width: 100%;
+    padding: 6px 8px;
+    border-radius: 4px;
+    border: 1px solid #ccc;
+    box-sizing: border-box;
+    background: var(--panel);
+    color: var(--fg);
+  }
+
+  button {
+    padding: 8px 16px;
+    border-radius: 4px;
+    border: none;
+    background: #2563eb;
+    color: #fff;
+    font-weight: 600;
+    cursor: pointer;
+    margin-top: 8px;
+  }
+  button:hover { background: #1d4ed8; }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 20px;
+    font-size: 0.9rem;
+  }
+
+  th, td {
+    border: 1px solid #ddd;
+    padding: 6px 8px;
+    text-align: right;
+  }
+
+  th {
+    background: var(--table-head);
+    text-align: left;
+  }
+
+  th:nth-child(n+2),
+  td:nth-child(n+2) {
+    text-align: right;
+  }
+
+  .editable {
+    background: var(--edit-bg);
+    cursor: pointer;
+  }
+
+  /* Toggle switch */
+  .switch {
+    position: relative;
+    display: inline-block;
+    width: 46px;
+    height: 24px;
+  }
+  .switch input { display: none; }
+  .slider {
+    position: absolute;
+    cursor: pointer;
+    top: 0; left: 0;
+    right: 0; bottom: 0;
+    background-color: #ccc;
+    transition: .3s;
+    border-radius: 24px;
+  }
+  .slider:before {
+    position: absolute;
+    content: "";
+    height: 18px;
+    width: 18px;
+    left: 3px;
+    bottom: 3px;
+    background: white;
+    border-radius: 50%;
+    transition: .3s;
+  }
+  input:checked + .slider { background-color: #4CAF50; }
+  input:checked + .slider:before { transform: translateX(22px); }
+</style>
+
+</head>
+<body>
+
+<div class="container">
+  <h1>Retirement Sequence Simulator</h1>
+  <p>Simulate withdrawals over historical returns and inflation.</p>
+
+  <div class="form-row">
+    <div>
+      <label>Starting Balance</label>
+      <input type="number" id="startBalance" value="2000000" />
+    </div>
+    <div>
+      <label>Beginning Year (1990–2025)</label>
+      <input type="number" id="startYear" value="1990" />
+    </div>
+    <div>
+      <label>Initial Withdrawal (before inflation)</label>
+      <input type="number" id="baseWithdrawal" value="200000" />
+    </div>
+    <div>
+      <label>
+        <input type="checkbox" id="skipDown" checked>
+        Skip withdrawals after down years
+      </label>
+    </div>
+  </div>
+
+  <button id="runBtn">Run Simulation</button>
+
+  <table id="resultsTable" style="display:none;">
+    <thead>
+      <tr>
+        <th>Year</th>
+        <th>Start Balance</th>
+        <th>Withdraw?</th>
+        <th>Withdrawal</th>
+        <th>Return %</th>
+        <th>Dollar Return</th>
+        <th>Ending Balance</th>
+      </tr>
+    </thead>
+    <tbody></tbody>
+  </table>
+
+  <br><br>
+  <button onclick="document.body.classList.toggle('dark')">
+    Toggle Light/Dark
+  </button>
+</div>
+
+<script>
+/* ---------------------------- */
+/*      DATA THROUGH 2025       */
+/* ---------------------------- */
+
+const years = [
+  1990,1991,1992,1993,1994,1995,1996,1997,1998,1999,
+  2000,2001,2002,2003,2004,2005,2006,2007,2008,2009,
+  2010,2011,2012,2013,2014,2015,2016,2017,2018,2019,
+  2020,2021,2022,2023,2024,2025
+];
+
+const inflation = [
+  5.39,4.23,3.03,2.96,2.61,2.81,3.29,2.34,1.55,2.19,
+  3.38,2.83,1.59,2.27,2.68,3.39,3.24,2.85,3.85,-0.36,
+  1.64,3.16,2.07,1.46,1.62,0.12,1.26,2.13,2.44,1.81,
+  1.2,4.7,8.0,4.1,2.9,2.6
+];
+
+const portfolioReturns = [
+  2.72,25.78,7.51,10.34,-0.17,29.33,15.43,23.27,20.96,12.70,
+  -1.41,-4.76,-7.56,19.65,8.16,3.82,11.21,7.08,-20.06,17.94,
+  11.15,5.50,11.28,19.74,10.66,1.05,8.75,14.52,-1.75,22.23,
+  15.0,15.95,-16.96,17.50,15.36,13.78
+];
+
+/* ---------------------------- */
+/*        HELPER FUNCS          */
+/* ---------------------------- */
+
+function fmt(x) { return x.toLocaleString(undefined,{maximumFractionDigits:0}); }
+
+function parseCell(cell) {
+  const raw = cell.innerText.replace(/,/g,"").trim();
+  if (raw === "") return 0;
+  const n = Number(raw);
+  return isNaN(n) ? 0 : n;
+}
+
+/* ---------------------------- */
+/*        BUILD SIMULATION       */
+/* ---------------------------- */
+
+document.getElementById("runBtn").onclick = runSim;
+
+function runSim() {
+  const startBal = Number(document.getElementById("startBalance").value);
+  const startYear = Number(document.getElementById("startYear").value);
+  const baseW = Number(document.getElementById("baseWithdrawal").value);
+  const skipDown = document.getElementById("skipDown").checked;
+
+  const idx = years.indexOf(startYear);
+  if (idx === -1) { alert("Start year must be between 1990 and 2025."); return; }
+
+  const yrsToSim = years.length - idx;
+  buildTable(idx, yrsToSim, startBal, baseW, skipDown);
+  document.getElementById("resultsTable").style.display = "table";
+}
+
+function buildTable(startIdx, yrsToSim, startBal, baseW, skipDown) {
+  const tbody = document.querySelector("#resultsTable tbody");
+  tbody.innerHTML = "";
+
+  let balance = startBal;
+  let lastReal = baseW;
+
+  for (let i = 0; i < yrsToSim; i++) {
+    const yIndex = startIdx + i;
+    const yr = years[yIndex];
+    const ret = portfolioReturns[yIndex];
+
+    const row = document.createElement("tr");
+
+    const initialW = (i === 0) ? baseW : 0;
+
+    row.innerHTML = `
+      <td>${yr}</td>
+      <td class="startBal">${fmt(balance)}</td>
+
+      <td>
+        <label class="switch">
+          <input type="checkbox" class="toggleWithdraw" checked>
+          <span class="slider"></span>
+        </label>
+      </td>
+
+      <td class="withdraw editable" contenteditable="true">${fmt(initialW)}</td>
+      <td>${ret.toFixed(2)}</td>
+      <td class="dollarRet"></td>
+      <td class="endBal"></td>
+    `;
+
+    tbody.appendChild(row);
+
+    balance = applyRow(row, balance, ret);
+
+    lastReal = initialW;
+  }
+
+  attachHandlers(startIdx, yrsToSim, startBal, baseW, skipDown);
+}
+
+function applyRow(row, bal, ret) {
+  let w = parseCell(row.querySelector(".withdraw"));
+  const toggle = row.querySelector(".toggleWithdraw").checked;
+
+  if (!toggle || w === 0) w = 0;
+
+  const after = bal - w;
+  const dR = after * (ret / 100);
+  const end = after + dR;
+
+  row.querySelector(".dollarRet").innerText = fmt(dR);
+  row.querySelector(".endBal").innerText = fmt(end);
+
+  return end;
+}
+
+function attachHandlers(startIdx, yrsToSim, startBal, baseW, skipDown) {
+  const rows = [...document.querySelectorAll("#resultsTable tbody tr")];
+
+  rows.forEach(r => {
+    r.querySelector(".toggleWithdraw").addEventListener("change", () =>
+      recalcAll(startIdx, yrsToSim, startBal, baseW, skipDown)
+    );
+    r.querySelector(".withdraw").addEventListener("blur", () => {
+      let v = parseCell(r.querySelector(".withdraw"));
+      r.querySelector(".withdraw").innerText = fmt(v);
+      recalcAll(startIdx, yrsToSim, startBal, baseW, skipDown);
+    });
+  });
+}
+
+function recalcAll(startIdx, yrsToSim, startBal, baseW, skipDown) {
+  const rows = [...document.querySelectorAll("#resultsTable tbody tr")];
+
+  let bal = startBal;
+  let lastReal = baseW;
+
+  for (let i = 0; i < rows.length; i++) {
+    const row = rows[i];
+    const ret = portfolioReturns[startIdx + i];
+    const infl = 1 + inflation[startIdx + i] / 100;
+
+    const toggle = row.querySelector(".toggleWithdraw").checked;
+    let manual = parseCell(row.querySelector(".withdraw"));
+    let w;
+
+    if (!toggle || manual === 0) {
+      w = 0;
+    } else if (manual > 0) {
+      w = manual;
+      lastReal = manual;
+    } else {
+      if (lastReal > 0) {
+        w = Math.floor(lastReal * infl);
+        lastReal = w;
+      } else {
+        w = 0;
+      }
+    }
+
+    row.querySelector(".withdraw").innerText = fmt(w);
+
+    const after = bal - w;
+    const dR = after * (ret / 100);
+    const end = after + dR;
+
+    row.querySelector(".startBal").innerText = fmt(bal);
+    row.querySelector(".dollarRet").innerText = fmt(dR);
+    row.querySelector(".endBal").innerText = fmt(end);
+
+    bal = end;
+  }
+}
+</script>
+
+</body>
+</html>
